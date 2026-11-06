@@ -10,11 +10,13 @@ from telegram.ext import (
     ContextTypes
 )
 
-TOKEN = "REPLACE_WITH_YOUR_BOT_TOKEN"
+TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
 
 OLLAMA_BASE_URL = "http://localhost:11434/"
 MODEL = "gemma4:12b"
 MODELS = []
+HISTORY = []
+
 
 replacements = {
     "NAME": "",
@@ -29,35 +31,42 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global HISTORY
+
     if not context.args:
         await update.message.reply_text("No question specified!")
         return
 
     questi = " ".join(context.args)
+
     url = f"{OLLAMA_BASE_URL.rstrip('/')}/api/chat"
+
+    HISTORY.append({
+        "role": "user",
+        "content": questi
+    })
 
     payload = {
         "model": MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": questi
-            }
-        ],
+        "messages": HISTORY,
         "stream": False
     }
 
     async with httpx.AsyncClient() as client:
         response = await client.post(url, json=payload, timeout=120)
 
-
     response.raise_for_status()
 
     data = response.json()
 
-    await update.message.reply_text(
-        data['message']['content']
-    )
+    answer = data["message"]["content"]
+
+    HISTORY.append({
+        "role": "assistant",
+        "content": answer
+    })
+
+    await update.message.reply_text(answer)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
